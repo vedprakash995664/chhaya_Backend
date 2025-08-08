@@ -8,7 +8,7 @@ const {
   staffHeadLogin
 } = require('../Controller/staffHeadController');
 
-const upload = require('../Middleware/upload'); // multer + cloudinary
+const {upload} = require('../Middleware/upload'); // multer + cloudinary
 
 // Add staff head (photo optional)
 router.post('/add', upload.single('photo'), addStaffHead);

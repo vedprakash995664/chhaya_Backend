@@ -1,16 +1,16 @@
 const mongoose = require('mongoose');
-const Counter = require('./Counter.js')
-const registrationSchema = new mongoose.Schema({
+
+const ClientFormSchema = new mongoose.Schema({
   // Personal Details
-  fullName: { type: String, },
-  fatherName: { type: String, },
-  address: { type: String, },
-  state: { type: String, },
-  pinCode: { type: String, },
-  contactNo: { type: String, },
-  whatsAppNo: { type: String },
-  familyContact: { type: String },
-  email: { type: String },
+  fullName: String,
+  fatherName: String,
+  address: String,
+  state: String,
+  pinCode: String,
+  contactNo: String,
+  whatsAppNo: String,
+  familyContact: String,
+  email: String,
 
   // Passport Details
   passportNumber: { type: String, required: true },
@@ -22,67 +22,77 @@ const registrationSchema = new mongoose.Schema({
   ecnr: { type: Boolean, default: false },
 
   // Work Details
-  occupation: { type: String },
-  placeOfEmployment: { type: String },
-  lastExperience: { type: String },
-  lastSalaryPostDetails: { type: String },
-  expectedSalary: { type: String },
-  medicalReport: { type: String },
-  pccStatus: { type: String },
-
-  // Office Section
-  agentCode: { type: String },
-  officeConfirmation: {
-    country: { type: String },
-    work: { type: String },
-    salary: { type: String }
+  occupation: String,
+  placeOfEmployment: String,
+  lastExperience: String,
+  lastSalaryPostDetails: String,
+  expectedSalary: String,
+  medicalReport: String,
+  pccStatus: String,
+  photo: {
+    type: String,
+    required: true,
+  },
+  Sign: {
+    type: String,
+    required: true,
   },
 
-
-  photo: {
-  type: String,
-  required: true  // if mandatory
-},
-signature: {
-  type: String,
-  required: true  // if mandatory
-},
-
-  // Meta
-  date: { type: Date, default: Date.now },
+  // Office Section
+  agentCode: String,
+  officeConfirmation: {
+    country: String,
+    work: String,
+    salary: String,
+  },
+  transferredDate: {
+    type: Date,
+    default: Date.now()
+  },
+  transferredTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'StaffHead',
+  },
+  transferredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CallingTeam',
+  },
   regNo: { type: String, unique: true },
   filledBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CallingTeam',
-    required: true
   },
   leadId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Lead',
-    required: true
-  }
+  },
+
+},{
+   timestamps: true 
 });
 
-// Auto-increment hook before save
-registrationSchema.pre('save', async function (next) {
+// Auto-generate regNo without Counter
+ClientFormSchema.pre('save', async function (next) {
   const doc = this;
-  if (doc.isNew) {
-    try {
-      const counter = await Counter.findOneAndUpdate(
-        { name: 'registration' },
-        { $inc: { seq: 1 } },
-        { new: true, upsert: true }
-      );
 
-      const formattedNumber = String(counter.seq).padStart(3, '0');
-      doc.regNo = `CHY${formattedNumber}`;
-      next();
-    } catch (err) {
-      next(err);
+  if (!doc.isNew) return next();
+
+  try {
+    const lastDoc = await mongoose.model('ClientForm').findOne({}, { regNo: 1 })
+      .sort({ regNo: -1 })
+      .lean();
+
+    let nextNumber = 1;
+    if (lastDoc && lastDoc.regNo) {
+      const numPart = parseInt(lastDoc.regNo.replace('CHY', ''), 10);
+      nextNumber = numPart + 1;
     }
-  } else {
+
+    doc.regNo = `CHY${String(nextNumber).padStart(3, '0')}`;
     next();
+  } catch (err) {
+    next(err);
   }
 });
 
-module.exports = mongoose.model('Registration', registrationSchema);
+module.exports = mongoose.model('ClientForm', ClientFormSchema);

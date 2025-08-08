@@ -1,16 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const registrationController = require('../Controller/ClientFromController');
-const uploadRegistration = require('../Middleware/uploadClientForm'); // custom Multer setup for photo/signature
+const {clientUpload} = require('../Middleware/upload');
+// Add new registration (no photo/signature)
+router.post('/add',clientUpload, registrationController.addRegistration);
+router.post('/transfer',registrationController.transferClientForms);
 
-// Route to add a new registration with photo and signature uploads
-router.post(
-  '/add',
-  uploadRegistration.fields([
-    { name: 'photo', maxCount: 1 },
-    { name: 'signature', maxCount: 1 }
-  ]),
-  registrationController.addRegistration
-);
+router.get('/getAll', registrationController.getAllRegistrations);
+
+
+router.get('/get-transferred/:transferredTo', registrationController.getRegistrationsByTransferredTo);
+router.get('/getbyId/:id', registrationController.getRegistrationById);
 
 module.exports = router;

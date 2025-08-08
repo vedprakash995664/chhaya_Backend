@@ -44,6 +44,8 @@ const leadSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   }
+},{
+   timestamps: true 
 });
 
 module.exports = mongoose.model('Lead', leadSchema);
