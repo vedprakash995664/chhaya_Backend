@@ -1,4 +1,5 @@
 const Lead = require('../Models/ContactsModel');
+const ClientForm =require('../Models/ClientForm')
 
 exports.uploadLeads = async (req, res) => {
   try {
@@ -67,28 +68,36 @@ exports.getLeads = async (req, res) => {
   }
 };
 
+exports.getPassportHolderLeads = async (req, res) => {
+  try {
+    const { search } = req.query;
+    const { assignedToId } = req.params; // get AssignedTO from URL params
+    let query = {
+      status: 'Passport Holder',          // only Client status
+      AssignedTO: assignedToId   // match AssignedTO with given id
+    };
+
+    // Optional: search by mobile number
+    if (search) {
+      query.number = new RegExp(search, 'i');
+    }
+
+    const leads = await Lead.find(query)
+      .populate('zone')
+      .populate('uploadedBy')
+      .populate('transferredTo')
+      .populate('AssignedTO') // populate calling team details
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(leads);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to fetch leads' });
+  }
+};
+
+
   
-// // GET /api/contact/get-assigned-leads/:assignedToId
-// exports.getLeadsByAssignedTo = async (req, res) => {
-//   try {
-//     const { assignedToId } = req.params;
-
-//     const leads = await Lead.find({ AssignedTO: assignedToId })
-//       .populate('zone')
-//       .populate('uploadedBy')
-//       .populate('transferredTo')
-//       .populate('AssignedTO')
-//       .populate('AssignedBy')
-//       .sort({ AssignedDate: -1 });
-
-//     res.status(200).json(leads);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: 'Failed to fetch assigned leads' });
-//   }
-// };
-
-
 
 // GET /api/contact/get-assigned-leads/:assignedToId
 exports.getLeadsByAssignedTo = async (req, res) => {
@@ -166,6 +175,167 @@ exports.assignLeads = async (req, res) => {
     res.status(500).json({ message: 'Failed to assign leads' });
   }
 };
+
+
+exports.ApplyForInterview = async (req, res) => {
+  const { leadId, callingTeamId, interviewManagerId } = req.body;
+
+  try {
+    // Basic validation
+    if (!leadId) return res.status(400).json({ message: "Lead ID is required" });
+    if (!callingTeamId) return res.status(400).json({ message: "Calling Team ID is required" });
+    if (!interviewManagerId) return res.status(400).json({ message: "Interview Manager ID is required" });
+
+    // Check lead
+    const lead = await Lead.findById(leadId);
+    if (!lead) return res.status(404).json({ message: "Lead not found" });
+
+    // Must have passport
+    if (!lead.passportNumber) {
+      return res.status(400).json({ message: "Lead must have a passport number" });
+    }
+
+    // Only passport holders
+    if (lead.status !== "Passport Holder") {
+      return res.status(400).json({ message: "Only passport holders can apply for interview" });
+    }
+
+    // Already applied check
+    if (lead.InterviewManager) {
+      return res.status(400).json({ message: "Interview already applied for this lead" });
+    }
+
+    // Update lead directly
+    const updatedLead = await Lead.findByIdAndUpdate(
+      leadId,
+      {
+        InterviewManager: interviewManagerId,
+        InterviewAppliedBy: callingTeamId,
+        InterviewApplyDate: new Date(),
+        InterviewStatus: "Applied",
+      },
+      { new: true }
+    );
+
+    const clientForm=await ClientForm.findOne({leadId:id})
+    
+    if(clientForm){
+      clientForm.InterviewStatus='Applied'
+      await clientForm.save();
+    }
+
+    res.status(200).json({
+      message: "Interview applied successfully",
+      lead: updatedLead,
+    });
+
+  } catch (err) {
+    console.error("ApplyForInterview Error:", err);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
+
+// GET Leads by Interview Manager with pagination & search
+exports.getLeadsByInterviewManager = async (req, res) => {
+  try {
+    const { InterviewManagerId } = req.params;
+    const { page = 1, limit = 10, search = "" } = req.query;
+
+    const skip = (page - 1) * limit;
+
+    let query = { InterviewManager: InterviewManagerId };
+
+    // 🔍 Add search filter (number, passportNumber, zone, etc.)
+    if (search) {
+      query.$or = [
+        { number: { $regex: search, $options: "i" } },
+        { passportNumber: { $regex: search, $options: "i" } },
+        { zone: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const [leads, total] = await Promise.all([
+      Lead.find(query)
+        .populate("InterviewAppliedBy")
+        .populate("zone")
+        .skip(skip)
+        .limit(Number(limit)),
+      Lead.countDocuments(query),
+    ]);
+
+    res.status(200).json({
+      leads,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch leads" });
+  }
+};
+
+
+exports.markInterviewPass = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const contact = await Lead.findByIdAndUpdate(
+      id,
+      {
+        InterviewStatus: "Pass",
+      },
+      { new: true }
+    );
+    
+    if (!contact) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    const clientForm=await ClientForm.findOne({leadId:id})
+    
+    if(clientForm){
+      clientForm.InterviewStatus='Pass'
+      await clientForm.save();
+    }
+
+
+    res.json({ message: "Interview marked as Pass", contact });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating interview status", error: error.message });
+  }
+};
+
+exports.markInterviewFail = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const contact = await Lead.findByIdAndUpdate(
+      id,
+      {
+        InterviewStatus: "Fail",
+      },
+      { new: true }
+    );
+
+    if (!contact) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    const clientForm=await ClientForm.findOne({leadId:id})
+    
+    if(clientForm){
+      clientForm.InterviewStatus='Fail'
+      await clientForm.save();
+    }
+
+    res.json({ message: "Interview marked as Fail", contact });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating interview status", error: error.message });
+  }
+};
+
 
 
 
@@ -258,17 +428,69 @@ exports.getLeadsByTransferredTo = async (req, res) => {
 exports.updateLeadStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, passportNumber } = req.body;
 
-    if (!status) return res.status(400).json({ message: 'Status is required' });
+    if (!status) {
+      return res.status(400).json({ message: 'Status is required' });
+    }
 
-    const updated = await Lead.findByIdAndUpdate(id, { status }, { new: true });
+    // Build update object dynamically
+    const updateData = { status };
 
-    if (!updated) return res.status(404).json({ message: 'Lead not found' });
+    if (passportNumber && passportNumber.trim() !== '') {
+      updateData.passportNumber = passportNumber;
+    }
+
+    const updated = await Lead.findByIdAndUpdate(id, updateData, { new: true });
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
 
     res.status(200).json({ message: 'Status updated', lead: updated });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to update status' });
+  }
+};
+
+// PUT /api/contact/update-form-filled/:id
+exports.updateFormFilled = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedLead = await Lead.findByIdAndUpdate(
+      id,
+      { isFormFilled:true },
+      { new: true }
+    );
+
+    if (!updatedLead) {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+
+    res.json({
+      message: 'Lead form status updated successfully',
+      lead: updatedLead
+    });
+  } catch (error) {
+    console.error('Error updating form filled status:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+
+
+//Get By Id
+
+exports.getContactById = async (req, res) => {
+  try {
+    const registration = await Lead.findById(req.params.id);
+    if (!registration) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+    res.status(200).json(registration);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
   }
 };

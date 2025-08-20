@@ -6,7 +6,7 @@ exports.addRegistration = async (req, res) => {
       fullName, fatherName, address, state, pinCode, contactNumber,
       whatsappNumber, familyContact, email, passportNumber, dob,
       passportIssue, passportExpiry, nationality, ecr, ecnr,
-      occupation, placeOfEmployment, lastExperience, lastSalary,
+      occupation, placeOfEmployment, lastExperience, lastSalary,InterviewStatus,ServiceCharge,MedicalCharge,
       expectedSalary, medicalReport, pccStatus, agentCode,
       country, work, salary, filledBy, leadId,
     } = req.body;
@@ -42,6 +42,7 @@ exports.addRegistration = async (req, res) => {
       lastSalaryPostDetails: lastSalary,
       expectedSalary,
       medicalReport,
+      InterviewStatus,
       pccStatus,
       agentCode,
       Sign: signUrl,
@@ -49,7 +50,9 @@ exports.addRegistration = async (req, res) => {
       officeConfirmation: {
         country,
         work,
-        salary
+        salary,
+        ServiceCharge,
+        MedicalCharge
       },
       filledBy,
       leadId
@@ -63,40 +66,44 @@ exports.addRegistration = async (req, res) => {
   }
 };
 
+// PUT /api/registration/:id
+  exports.updateRegistration = async (req, res) => {
+    try {
+      const { id } = req.params;
 
-// exports.transferClientForms = async (req, res) => {
-//   try {
-//     const { leadIds, transferredTo, transferredBy } = req.body;
+      // Exclude restricted fields from update
+      const {
+        contactNo,
+        email,
+        agentCode,
+        passportNumber,
+        passportIssue,
+        passportExpiry,
+        dateOfBirth,
+        photo,
+        Sign,
+        ...updateFields
+      } = req.body;
 
-//     if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
-//       return res.status(400).json({ message: 'leadIds must be a non-empty array.' });
-//     }
+      const updatedRegistration = await Registration.findByIdAndUpdate(
+        id,
+        { $set: updateFields },
+        { new: true, runValidators: true }
+      );
 
-//     if (!transferredTo || !transferredBy) {
-//       return res.status(400).json({ message: 'transferredTo and transferredBy are required.' });
-//     }
+      if (!updatedRegistration) {
+        return res.status(404).json({ message: 'Registration not found' });
+      }
 
-//     const updateResult = await Registration.updateMany(
-//       { _id: { $in: leadIds } },
-//       {
-//           transferredTo,
-//           transferredBy,
-//           transferredDate: Date.now(),
-//         }
-//     );
-//     console.log(updateResult);
-    
-
-//     res.status(200).json({
-//       message: `${updateResult.modifiedCount} client(s) transferred successfully.`,
-//     });
-//   } catch (error) {
-//     console.error('Transfer error:', error);
-//     res.status(500).json({ message: 'Internal server error.', error: error.message });
-//   }
-// };
-
-
+      res.status(200).json({
+        message: 'Registration updated successfully',
+        data: updatedRegistration
+      });
+    } catch (err) {
+      console.error('Error updating registration:', err);
+      res.status(500).json({ message: err.message });
+    }
+  };
 
 
 exports.transferClientForms = async (req, res) => {
@@ -144,8 +151,6 @@ exports.transferClientForms = async (req, res) => {
   }
 };
 
-
-
 //get all forms
 exports.getAllRegistrations = async (req, res) => {
   try {
@@ -156,9 +161,6 @@ exports.getAllRegistrations = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-
-
 
 exports.getRegistrationsByTransferredTo = async (req, res) => {
   try {
@@ -201,8 +203,6 @@ exports.getRegistrationsByTransferredTo = async (req, res) => {
   }
 };
 
-
-
 exports.getRegistrationById = async (req, res) => {
   try {
     const registration = await Registration.findById(req.params.id);
@@ -212,6 +212,21 @@ exports.getRegistrationById = async (req, res) => {
     res.status(200).json(registration);
   } catch (err) {
     console.error(err);
+    res.status(500).json({ message: err.message });
+  }
+};
+// GET /api/registration/by-lead/:leadId
+exports.getRegistrationByLeadId = async (req, res) => {
+  try {
+    const registration = await Registration.findOne({ leadId: req.params.leadId });
+
+    if (!registration) {
+      return res.status(404).json({ message: 'Registration not found' });
+    }
+
+    res.status(200).json(registration);
+  } catch (err) {
+    console.error('Error fetching registration by leadId:', err);
     res.status(500).json({ message: err.message });
   }
 };

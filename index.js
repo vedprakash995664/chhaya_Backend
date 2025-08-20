@@ -19,6 +19,14 @@ const StaffHeadRoutes = require('./Routes/staffHeadRoutes');
 app.use('/api/staff-heads', StaffHeadRoutes);
 
 
+const PreVisaRoutes = require('./Routes/PreVisaRoutes');
+app.use('/api/pre-visa', PreVisaRoutes);
+
+const InterviewManager = require('./Routes/InterviewManagerRoute');
+app.use('/api/interview-manager', InterviewManager);
+
+const FinalVisaRoutes = require('./Routes/FinalVisaRoutes');
+app.use('/api/final-visa', FinalVisaRoutes);
 
 const SMMRoutes = require('./Routes/smmRoute');
 app.use('/api/smm', SMMRoutes);
@@ -26,6 +34,8 @@ app.use('/api/smm', SMMRoutes);
 
 const ContactsRoutes = require('./Routes/ContactRoutes');
 app.use('/api/contact', ContactsRoutes);
+const PaymentBook = require('./Routes/PaymentBookRoutes');
+app.use('/api/payment', PaymentBook);
 
 
 const CallingTeam = require('./Routes/callingTeamRoutes');

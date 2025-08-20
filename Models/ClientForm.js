@@ -28,6 +28,7 @@ const ClientFormSchema = new mongoose.Schema({
   lastSalaryPostDetails: String,
   expectedSalary: String,
   medicalReport: String,
+  InterviewStatus: String,
   pccStatus: String,
   photo: {
     type: String,
@@ -39,11 +40,16 @@ const ClientFormSchema = new mongoose.Schema({
   },
 
   // Office Section
-  agentCode: String,
+  agentCode: {
+     type: mongoose.Schema.Types.ObjectId,
+    ref: 'CallingTeam',
+  },
   officeConfirmation: {
     country: String,
     work: String,
     salary: String,
+    ServiceCharge: String,
+    MedicalCharge: String,
   },
   transferredDate: {
     type: Date,
